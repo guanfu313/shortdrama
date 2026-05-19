@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>短剧人格测试</title>
+<style>
+/* ============================================================ */
+/* 全局重置 & 变量 */
+/* ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --pk: #E62E6B;
+  --pk-dark: #C4205A;
+  --pk-light: #FF6B9D;
+  --bg: #1A1A2E;
+  --bg-card: #16213E;
+  --text: #F0E6FF;
+  --text-muted: #9B8EB5;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --shadow: 0 4px 20px rgba(0,0,0,.3);
+  --font: 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
+}
+html, body { height: 100%; font-family: var(--font); background: var(--bg); color: var(--text); }
+body { overflow-x: hidden; }
+a { color: var(--pk); text-decoration: none; }
+
+/* ============================================================ */
+/* 通用组件 */
+/* ============================================================ */
+.page { display: none; min-height: 100vh; padding: 20px 16px 40px; animation: fadeIn .35s ease; }
+.page.active { display: block; }
+@keyframes fadeIn { 0%{opacity:0;transform:translateY(12px)} 100%{opacity:1;transform:translateY(0)} }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 14px 28px; border: 0; border-radius: 50px;
+  font-size: 16px; font-weight: 700; cursor: pointer; transition: all .2s;
+  font-family: var(--font);
+}
+.btn-primary { background: linear-gradient(135deg,var(--pk),var(--pk-dark)); color: #fff; }
+.btn-primary:active { transform: scale(.96); }
+.btn-outline { background: transparent; border: 2px solid var(--pk); color: var(--pk); }
+.btn-outline:active { background: var(--pk); color: #fff; }
+.btn-sm { padding: 10px 20px; font-size: 14px; }
+
+/* 顶部栏 */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0; margin-bottom: 16px;
+}
+.topbar h1 { font-size: 20px; font-weight: 800; }
+.topbar .back { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: var(--bg-card); cursor: pointer; font-size: 18px; }
+
+/* ============================================================ */
+/* 欢迎页 */
+/* ============================================================ */
+#welcome { padding-top: 40px; }
+.welcome-title { text-align: center; margin-bottom: 8px; }
+.welcome-title .big { font-size: 32px; font-weight: 900; background: linear-gradient(135deg,var(--pk),var(--pk-light));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.welcome-title .sub { font-size: 14px; color: var(--text-muted); margin-top: 6px; }
+.welcome-title .sub span { color: var(--pk); -webkit-text-fill-color: var(--pk); }
+
+.welcome-actions { display: flex; flex-direction: column; gap: 12px; margin: 24px 0; }
+.btn-random {
+  width: 100%; padding: 18px; font-size: 18px; gap: 8px;
+  background: linear-gradient(135deg,var(--pk),#FF4D8C);
+  box-shadow: 0 6px 24px rgba(230,46,107,.35);
+}
+
+/* 世界选择区 */
+.world-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+.world-card {
+  background: var(--bg-card); border-radius: var(--radius); padding: 16px 12px;
+  text-align: center; cursor: pointer; transition: all .2s; border: 2px solid transparent;
+  position: relative;
+}
+.world-card:active { transform: scale(.96); }
+.world-card .emoji { font-size: 32px; margin-bottom: 6px; }
+.world-card .wname { font-size: 14px; font-weight: 700; }
+.world-card .wdesc { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.world-card .wprob { font-size: 10px; color: var(--text-muted); margin-top: 4px; opacity: .6; }
+.world-card.ssr { border-color: #FFD700; animation: ssrGlow 2s infinite; }
+.world-card.ssr .ssr-badge {
+  position: absolute; top: -8px; right: -8px; background: linear-gradient(135deg,#FFD700,#FFA500);
+  color: #1A1A2E; font-size: 10px; font-weight: 900; padding: 3px 8px; border-radius: 20px;
+}
+.world-card.locked { opacity: .5; cursor: not-allowed; }
+.world-card.locked .lock-icon { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  font-size: 28px; opacity: .4; }
+@keyframes ssrGlow { 0%,100%{box-shadow:0 0 8px rgba(255,215,0,.3)} 50%{box-shadow:0 0 20px rgba(255,215,0,.5)} }
+
+/* 人格预览 */
+.preview-section { margin-top: 20px; }
+.preview-section h3 { font-size: 14px; color: var(--text-muted); margin-bottom: 12px; }
+.preview-scroll { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; }
+.preview-item { flex-shrink: 0; width: 76px; text-align: center; cursor: pointer; }
+.preview-item .avatar {
+  width: 60px; height: 60px; border-radius: 50%; margin: 0 auto 6px;
+  display: flex; align-items: center; justify-content: center; font-size: 28px;
+  border: 2px solid var(--pk); transition: all .2s;
+}
+.preview-item:active .avatar { transform: scale(.92); }
+.preview-item .pname { font-size: 11px; color: var(--text-muted); }
+
+/* ============================================================ */
+/* 测试页 */
+/* ============================================================ */
+.test-header { margin-bottom: 20px; }
+.test-header .world-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-bottom: 8px;
+}
+.progress-bar { height: 6px; background: var(--bg-card); border-radius: 3px; overflow: hidden; margin-bottom: 4px; }
+.progress-bar .fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
+.progress-text { font-size: 12px; color: var(--text-muted); text-align: right; }
+
+.question-area { background: var(--bg-card); border-radius: var(--radius); padding: 24px 18px; margin-bottom: 16px; }
+.question-area .q-number { font-size: 12px; color: var(--pk); font-weight: 700; margin-bottom: 12px; }
+.question-area .q-text { font-size: 18px; font-weight: 700; line-height: 1.5; }
+
+.options { display: flex; flex-direction: column; gap: 10px; }
+.option {
+  background: var(--bg-card); border: 2px solid rgba(255,255,255,.08);
+  border-radius: var(--radius-sm); padding: 14px 16px; cursor: pointer; transition: all .2s;
+  display: flex; align-items: flex-start; gap: 10px; font-size: 15px; line-height: 1.4;
+}
+.option:active { transform: scale(.97); border-color: var(--pk); }
+.option .label {
+  flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; background: rgba(255,255,255,.08); transition: all .2s;
+}
+.option.selected { border-color: var(--pk); background: rgba(230,46,107,.08); }
+.option.selected .label { background: var(--pk); color: #fff; }
+
+/* ============================================================ */
+/* 结果页 */
+/* ============================================================ */
+#result { padding-top: 24px; }
+.result-header { text-align: center; margin-bottom: 20px; }
+.result-header .world-tag-sm {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-bottom: 12px;
+}
+.result-card {
+  background: var(--bg-card); border-radius: var(--radius); padding: 28px 20px;
+  text-align: center; position: relative; border: 2px solid rgba(255,255,255,.06);
+}
+.result-card .avatar-placeholder {
+  width: 100px; height: 100px; border-radius: 50%; margin: 0 auto 16px;
+  display: flex; align-items: center; justify-content: center; font-size: 48px;
+  border: 3px solid var(--pk); box-shadow: 0 4px 20px rgba(230,46,107,.25);
+}
+.result-card .chara-name { font-size: 24px; font-weight: 900; margin-bottom: 4px; }
+.result-card .chara-code { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; }
+.result-card .chara-tag {
+  font-size: 15px; color: var(--pk); font-weight: 600; padding: 8px 16px;
+  background: rgba(230,46,107,.1); border-radius: 20px; display: inline-block; margin-bottom: 16px;
+}
+.result-card .chara-desc { font-size: 14px; line-height: 1.7; color: var(--text-muted); text-align: left; }
+
+/* 维度雷达（简化版柱形图） */
+.dim-chart { margin: 20px 0; }
+.dim-chart h4 { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; text-align: center; }
+.dim-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.dim-row .dim-label { width: 60px; font-size: 12px; color: var(--text-muted); text-align: right; flex-shrink: 0; }
+.dim-row .dim-bar-wrap { flex: 1; height: 20px; background: rgba(255,255,255,.06); border-radius: 10px; overflow: hidden; }
+.dim-row .dim-bar { height: 100%; border-radius: 10px; transition: width .8s ease; }
+.dim-row .dim-val { width: 28px; font-size: 11px; color: var(--text-muted); text-align: left; }
+
+.result-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+.share-hint { text-align: center; font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+
+/* 加载动画 */
+.loading-overlay {
+  position: fixed; inset: 0; background: var(--bg); z-index: 999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+}
+.loading-overlay .spinner { width: 40px; height: 40px; border: 4px solid var(--bg-card);
+  border-top-color: var(--pk); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to{transform:rotate(360deg)} }
+.loading-overlay .lt { font-size: 14px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<!-- ========== 加载遮罩 ========== -->
+<div id="loading" class="loading-overlay" style="display:none">
+  <div class="spinner"></div>
+  <div class="lt">正在解析你的短剧人格...</div>
+</div>
+
+<!-- ========== 欢迎页 ========== -->
+<div id="welcome" class="page active">
+  <div class="welcome-title">
+    <div class="big">🎬 短剧人格测试</div>
+    <div class="sub">测测你在短剧里是<span>什么角色</span></div>
+  </div>
+
+  <div class="welcome-actions">
+    <button class="btn btn-random" onclick="startRandom()">🎲 随机进入</button>
+  </div>
+
+  <div id="worldGrid" class="world-grid"></div>
+
+  <div class="preview-section">
+    <h3>🔥 热门人格</h3>
+    <div id="previewList" class="preview-scroll"></div>
+  </div>
+</div>
+
+<!-- ========== 测试页 ========== -->
+<div id="test" class="page">
+  <div class="topbar">
+    <div class="back" onclick="goHome()">←</div>
+    <h1 id="testWorldName">末日废土</h1>
+    <div style="width:36px"></div>
+  </div>
+
+  <div class="test-header">
+    <div id="testWorldTag" class="world-tag">🌆 末日废土</div>
+    <div class="progress-bar"><div id="progressFill" class="fill" style="width:0%"></div></div>
+    <div id="progressText" class="progress-text">1 / 12</div>
+  </div>
+
+  <div id="questionArea" class="question-area">
+    <div id="qNumber" class="q-number">第 1 题</div>
+    <div id="qText" class="q-text"></div>
+  </div>
+
+  <div id="optionsContainer" class="options"></div>
+</div>
+
+<!-- ========== 结果页 ========== -->
+<div id="result" class="page">
+  <div class="topbar">
+    <div class="back" onclick="goHome()">←</div>
+    <h1>你的短剧人格</h1>
+    <div style="width:36px"></div>
+  </div>
+
+  <div class="result-header">
+    <div id="resultWorldTag" class="world-tag-sm">🌆 末日废土</div>
+  </div>
+
+  <div class="result-card">
+    <div id="resultAvatar" class="avatar-placeholder">🐹</div>
+    <div id="resultName" class="chara-name">囤囤鼠</div>
+    <div id="resultCode" class="chara-code">DMS</div>
+    <div id="resultTag" class="chara-tag">末日三年，我家物资还能再囤三年</div>
+    <div id="resultDesc" class="chara-desc">你是末日里的囤积症晚期患者...</div>
+  </div>
+
+  <div id="dimChart" class="dim-chart"></div>
+
+  <div class="result-actions">
+    <button class="btn btn-primary" onclick="goHome()">🔄 再测一次</button>
+    <div class="share-hint">💡 截图分享到朋友圈，看看朋友是什么人格</div>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script>
+/* ============================================================ */
+/* 状态管理 */
+/* ============================================================ */
+const STATE = {
+  world: null,       // 当前世界ID
+  questions: [],     // 当前测试题
+  currentQ: 0,       // 当前题号(0-index)
+  answers: [],       // 用户答案索引数组
+  result: null,      // 结果角色
+}
+
+const W = WORLDS; const C = CHARA; const Q = QUESTIONS;
+
+/* ============================================================ */
+/* 路由系统 */
+/* ============================================================ */
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+function goHome() {
+  showPage('welcome');
+  window.location.hash = '#welcome';
+}
+
+/* ============================================================ */
+/* 欢迎页渲染 */
+/* ============================================================ */
+function renderWelcome() {
+  const grid = document.getElementById('worldGrid');
+  grid.innerHTML = W.map(w => {
+    const isSSR = w.id === 'R';
+    const isLocked = isSSR;
+    const probText = isSSR ? 'SSR 2%' : `${w.prob}%`;
+    return `<div class="world-card ${isSSR?'ssr':''} ${isLocked?'locked':''}"
+                onclick="${isLocked ? `showToast('⚠️ 规则怪谈被异界干扰，无法选中，试试随机入口~')` : `pickWorld('${w.id}')`}"
+                style="${isSSR ? '' : ''}">
+      ${isSSR ? '<div class="ssr-badge">SSR</div>' : ''}
+      <div class="emoji">${w.emoji}</div>
+      <div class="wname">${w.name}</div>
+      <div class="wdesc">${w.desc}</div>
+      <div class="wprob">${probText}</div>
+    </div>`;
+  }).join('');
+
+  // 热门人格预览
+  const preview = document.getElementById('previewList');
+  const topCharas = ['吗喽','死者','废物','囤囤鼠','恋爱脑保镖','疯批女王','摆烂AI','尤物'];
+  // 找对应的角色
+  const shown = [];
+  for (const name of topCharas) {
+    const found = Object.values(C).find(c => c.name === name);
+    if (found) shown.push(found);
+    if (shown.length >= 8) break;
+  }
+  preview.innerHTML = shown.map(c => {
+    const world = W.find(w => w.id === c.world);
+    return `<div class="preview-item">
+      <div class="avatar" style="border-color:${world?world.color:'var(--pk)'}">${c.emoji}</div>
+      <div class="pname">${c.name}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ============================================================ */
+/* 世界选择 & 随机 */
+/* ============================================================ */
+function pickWorld(id) {
+  STATE.world = id;
+  startTest(id);
+}
+
+function startRandom() {
+  // 按概率随机
+  const rand = Math.random() * 100;
+  let cum = 0;
+  for (const w of W) {
+    cum += w.prob;
+    if (rand < cum) {
+      STATE.world = w.id;
+      startTest(w.id);
+      return;
+    }
+  }
+  STATE.world = 'D'; // fallback
+  startTest('D');
+}
+
+/* ============================================================ */
+/* 测试流程 */
+/* ============================================================ */
+function startTest(worldId) {
+  STATE.currentQ = 0;
+  STATE.answers = [];
+
+  // 从对应世界题库随机抽12道
+  const pool = [...Q[worldId]];
+  shuffle(pool);
+  STATE.questions = pool.slice(0, 12);
+
+  // 渲染测试页面
+  const world = W.find(w => w.id === worldId);
+  document.getElementById('testWorldName').textContent = world.name;
+  document.getElementById('testWorldTag').innerHTML = `${world.emoji} ${world.name}`;
+  document.getElementById('testWorldTag').style.background = world.color + '22';
+  document.getElementById('testWorldTag').style.color = world.color;
+
+  showPage('test');
+  window.location.hash = '#test';
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const qi = STATE.currentQ;
+  const q = STATE.questions[qi];
+  const total = STATE.questions.length;
+
+  document.getElementById('qNumber').textContent = `第 ${qi+1} 题`;
+  document.getElementById('qText').textContent = q.q;
+
+  document.getElementById('progressFill').style.width = `${(qi/total)*100}%`;
+  document.getElementById('progressFill').style.background = getWorldColor(STATE.world);
+  document.getElementById('progressText').textContent = `${qi+1} / ${total}`;
+
+  const labels = ['A','B','C'];
+  document.getElementById('optionsContainer').innerHTML = q.opts.map((o, i) =>
+    `<div class="option" onclick="selectOption(${i})">
+      <div class="label">${labels[i]}</div>
+      <div>${o.t}</div>
+    </div>`
+  ).join('');
+}
+
+function selectOption(idx) {
+  STATE.answers.push(idx);
+  STATE.currentQ++;
+
+  if (STATE.currentQ >= STATE.questions.length) {
+    // 答题完毕，计算结果
+    computeResult();
+    return;
+  }
+  renderQuestion();
+}
+
+/* ============================================================ */
+/* 结果计算 */
+/* ============================================================ */
+function computeResult() {
+  showPage('test');
+  document.getElementById('loading').style.display = 'flex';
+
+  setTimeout(() => {
+    const worldId = STATE.world;
+    const qs = STATE.questions;
+    const ans = STATE.answers;
+
+    // 统计维度分数
+    const dims = DIMS[worldId];
+    const scores = {};
+    dims.forEach(d => scores[d] = 0);
+
+    qs.forEach((q, i) => {
+      const optIdx = ans[i];
+      if (optIdx === undefined) return;
+      const dimDelta = q.opts[optIdx].dims;
+      if (dimDelta) {
+        Object.keys(dimDelta).forEach(k => {
+          if (scores[k] !== undefined) scores[k] += dimDelta[k];
+        });
+      }
+    });
+
+    // 找出该世界总分最高的角色
+    const worldChars = Object.values(C).filter(c => c.world === worldId);
+    let bestChar = worldChars[0];
+    let bestScore = -1;
+
+    worldChars.forEach(ch => {
+      let score = 0;
+      dims.forEach(d => {
+        const userVal = scores[d] || 0;
+        const charVal = ch.dims[d] || 0;
+        score += userVal * charVal; // 点积相似度
+      });
+      if (score > bestScore) {
+        bestScore = score;
+        bestChar = ch;
+      }
+    });
+
+    STATE.result = bestChar;
+    showResult(bestChar, scores, dims);
+  }, 600);
+}
+
+/* ============================================================ */
+/* 结果页渲染 */
+/* ============================================================ */
+function showResult(chara, scores, dims) {
+  document.getElementById('loading').style.display = 'none';
+
+  const world = W.find(w => w.id === chara.world);
+  const wColor = world ? world.color : 'var(--pk)';
+
+  document.getElementById('resultWorldTag').innerHTML = `${world.emoji} ${world.name}`;
+  document.getElementById('resultWorldTag').style.background = wColor + '22';
+  document.getElementById('resultWorldTag').style.color = wColor;
+
+  document.getElementById('resultAvatar').textContent = chara.emoji;
+  document.getElementById('resultAvatar').style.borderColor = wColor;
+  document.getElementById('resultName').textContent = chara.name;
+  document.getElementById('resultCode').textContent = chara.code;
+  document.getElementById('resultTag').textContent = chara.tag;
+  document.getElementById('resultDesc').textContent = chara.desc;
+
+  // 维度柱形图
+  const labels = DIM_LABELS[chara.world] || dims;
+  const chart = document.getElementById('dimChart');
+  const maxScore = Math.max(...dims.map(d => scores[d] || 0), 1);
+
+  chart.innerHTML = `<h4>📊 你的人格维度</h4>` +
+    dims.map((d, i) => {
+      const val = scores[d] || 0;
+      const pct = Math.round((val / maxScore) * 100);
+      return `<div class="dim-row">
+        <div class="dim-label">${labels[i]||d}</div>
+        <div class="dim-bar-wrap">
+          <div class="dim-bar" style="width:${pct}%;background:${wColor}"></div>
+        </div>
+        <div class="dim-val">${val}</div>
+      </div>`;
+    }).join('');
+
+  showPage('result');
+  window.location.hash = '#result';
+}
+
+/* ============================================================ */
+/* 工具函数 */
+/* ============================================================ */
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function getWorldColor(id) {
+  const w = W.find(x => x.id === id);
+  return w ? w.color : 'var(--pk)';
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  let el = document.getElementById('toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'toast';
+    el.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--bg-card);color:var(--text);padding:12px 20px;border-radius:12px;font-size:14px;z-index:1000;box-shadow:var(--shadow);max-width:80vw;text-align:center;transition:opacity .3s;opacity:0;';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.style.opacity = '0', 2500);
+}
+
+/* ============================================================ */
+/* 初始化 */
+/* ============================================================ */
+renderWelcome();
+
+// 处理hash路由
+window.addEventListener('hashchange', () => {
+  const h = window.location.hash.slice(1) || 'welcome';
+  if (!document.getElementById(h)) return;
+  showPage(h);
+});
+</script>
+</body>
+</html>
