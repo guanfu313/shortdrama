@@ -306,9 +306,10 @@ a { color: var(--pk); text-decoration: none; }
   </div>
 
   <div class="result-actions">
-    <button class="btn btn-primary" onclick="sharePoster()">📸 分享海报</button>
+    <button class="btn btn-primary" onclick="copyResult()">📋 复制结果分享</button>
     <button class="btn btn-outline" onclick="goHome()">🔄 再测一次</button>
-    <div class="share-hint">💡 截图或分享海报到朋友圈，看看朋友是什么人格</div>
+    <button class="btn btn-outline btn-sm" onclick="sharePoster()" style="font-size:13px;padding:10px 16px">🖼️ 生成海报</button>
+    <div class="share-hint">💡 复制结果 → 粘贴到微信，看看朋友是什么人格</div>
   </div>
 </div>
 
@@ -720,6 +721,25 @@ function renderRecommendations(chara) {
       <span class="rec-arrow">→</span>
     </a>
   `).join('')
+}
+
+/* ============================================================ */
+/* 复制结果分享 */
+/* ============================================================ */
+function copyResult() {
+  const chara = STATE.result;
+  if (!chara) { showToast('⚠️ 请先完成测试'); return; }
+  const world = W.find(w => w.id === chara.world);
+  const text = '🎬 短剧人格测试结果\n\n' +
+    '我是【' + chara.name + ' ' + chara.code + '】' + world.emoji + ' ' + world.name + '\n' +
+    '「' + chara.tag + '」\n\n' +
+    '测测你是短剧里的什么角色～\n' +
+    'https://guanfu313.github.io/shortdrama/';
+  copyText(text);
+  showToast('✅ 已复制！粘贴到微信分享给好友吧');
+  if (typeof TRACKER !== 'undefined' && TRACKER.track) {
+    TRACKER.track('copy_result', { world: chara.world, chara: chara.code, chara_name: chara.name });
+  }
 }
 
 /* ============================================================ */
