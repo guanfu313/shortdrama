@@ -320,9 +320,7 @@ a { color: var(--pk); text-decoration: none; }
     <div class="m-emoji" id="unlockEmoji">🔒</div>
     <div class="m-title" id="unlockTitle">解锁世界</div>
     <div class="m-desc" id="unlockDesc">选择随机进入免费且快速，指定世界需要解锁～</div>
-    <button class="m-btn m-btn-share" onclick="handleUnlockShare()">📤 分享给好友免费解锁</button>
-    <button class="m-btn m-btn-wait" id="unlockWaitBtn" onclick="handleUnlockWait()">⏳ 等待 <span class="countdown" id="unlockCountdown">15</span> 秒</button>
-    <div class="m-tip">💡 分享后解锁永久有效，下次直接进入</div>
+    <button class="m-btn m-btn-share" onclick="handleUnlockShare()">📤 分享给好友解锁</button>
     <div class="m-close" onclick="closeUnlockModal()">算了，还是随机吧</div>
   </div>
 </div>
@@ -344,28 +342,17 @@ const STATE = {
 }
 
 // ====== 解锁系统 ======
-function isWorldUnlocked(id) {
-  try { return JSON.parse(localStorage.getItem('sd_unlocked')||'[]').includes(id) } catch(e){ return false }
-}
-function markUnlocked(id) {
-  try { var a=JSON.parse(localStorage.getItem('sd_unlocked')||'[]'); if(!a.includes(id)){ a.push(id); localStorage.setItem('sd_unlocked',JSON.stringify(a)) } } catch(e){}
-}
 function tryPickWorld(id) {
-  if (isWorldUnlocked(id)) { STATE.world=id; startTest(id); return }
-  STATE.pendingWorld=id; var w=W.find(function(x){return x.id===id});
-  document.getElementById('unlockEmoji').textContent=w.emoji;
-  document.getElementById('unlockTitle').textContent='🔒 解锁「'+w.name+'」';
-  document.getElementById('unlockDesc').innerHTML='选择 <span class="m-highlight">'+w.name+'</span> 需要解锁。<br>🎲 <b>随机进入</b>免费快速，还能抽 SSR！<br>📤 分享给好友即可永久解锁此世界 ~';
-  document.getElementById('unlockCountdown').textContent='15';
-  document.getElementById('unlockWaitBtn').classList.remove('unlocked');
-  document.getElementById('unlockWaitBtn').innerHTML='⏳ 等待 <span class="countdown" id="unlockCountdown">15</span> 秒';
-  if(window.unlockTimer){clearInterval(window.unlockTimer);window.unlockTimer=null}
+  STATE.pendingWorld = id;
+  const w = W.find(function(x){return x.id===id});
+  document.getElementById('unlockEmoji').textContent = w.emoji;
+  document.getElementById('unlockTitle').textContent = '🔒 解锁「'+w.name+'」';
+  document.getElementById('unlockDesc').innerHTML = '选择 <span class="m-highlight">'+w.name+'</span> 需要解锁。<br>🎲 <b>随机进入</b>免费快速，还能抽 SSR！<br>📤 分享给好友即可解锁此世界 ~';
   document.getElementById('unlockModal').classList.add('active');
 }
 function closeUnlockModal() {
   document.getElementById('unlockModal').classList.remove('active');
-  if(window.unlockTimer){clearInterval(window.unlockTimer);window.unlockTimer=null}
-  STATE.pendingWorld=null;
+  STATE.pendingWorld = null;
 }
 function handleUnlockShare() {
   var w=W.find(function(x){return x.id===STATE.pendingWorld}); if(!w)return;
@@ -374,16 +361,7 @@ function handleUnlockShare() {
   if(navigator.share){navigator.share({title:'短剧人格测试',text:t,url:u}).then(function(){doUnlock(w,'share')}).catch(function(){})}
   else{copyText(t+'\n'+u);showToast('📋 链接已复制！分享给微信好友即可解锁～');doUnlock(w,'share_manual')}
 }
-function handleUnlockWait() {
-  var b=document.getElementById('unlockWaitBtn'),c=document.getElementById('unlockCountdown');
-  if(b.classList.contains('unlocked')||window.unlockTimer)return;
-  var s=14; window.unlockTimer=setInterval(function(){
-    c.textContent=s; if(s<=0){clearInterval(window.unlockTimer);window.unlockTimer=null;
-      var w=W.find(function(x){return x.id===STATE.pendingWorld}); if(w)doUnlock(w,'wait')}
-    s--},1000);
-}
 function doUnlock(w,m) {
-  markUnlocked(w.id);
   if(typeof TRACKER!=='undefined'&&TRACKER.track)TRACKER.track('unlock_world',{world:w.id,unlock_method:m,world_name:w.name});
   closeUnlockModal(); STATE.world=w.id; startTest(w.id);
 }
