@@ -5,10 +5,10 @@
 // ============================================================
 
 const TRACKER = {
-  // Supabase 配置（暂时为空，你拿到配置后填这里）
-  supabaseUrl: '',
-  supabaseKey: '',
-  enabled: false,  // 设 true 才往远程发
+  // Supabase 配置
+  supabaseUrl: 'https://rokizgtbaajukolbfjsu.supabase.co',
+  supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJva2l6Z3RiYWFqdWtvbGJmanN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxNzU0MjgsImV4cCI6MjA5NDc1MTQyOH0.JQpPnF1TdmRqes8Wv7M2czQqUsoWlOJcCLfqlMaR6nQ',
+  enabled: true,  // 开启远程推送
 
   // 初始化
   init(supabaseUrl, supabaseKey) {
