@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>短剧人格测试 · 数据看板</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js">
+  </script>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      background:#0f0a1a;
+      color:#e0d0f0;
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+      padding:24px;
+      min-height:100vh;
+    }
+    h1 { font-size:22px; color:#c084fc; margin-bottom:4px; display:flex; align-items:center; gap:10px; }
+    h1 small { font-size:13px; color:#888; font-weight:400; }
+    .subtitle { color:#888; font-size:13px; margin-bottom:24px; }
+
+    /* 统计卡片 */
+    .stats { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px; margin-bottom:28px; }
+    .card {
+      background:linear-gradient(135deg,#1a1230,#231640);
+      border:1px solid #2f2050;
+      border-radius:12px;
+      padding:16px 18px;
+    }
+    .card .num { font-size:28px; font-weight:700; color:#f0e0ff; }
+    .card .label { font-size:12px; color:#a890c0; margin-top:4px; }
+    .card .sub { font-size:11px; color:#7a6a8a; margin-top:2px; }
+
+    /* 图表网格 */
+    .charts { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:28px; }
+    .chart-box {
+      background:#1a1230;
+      border:1px solid #2f2050;
+      border-radius:12px;
+      padding:16px;
+    }
+    .chart-box h3 { font-size:14px; color:#c084fc; margin-bottom:12px; }
+    .chart-box.full { grid-column:1/-1; }
+    .chart-box canvas { max-height:260px; max-width:100%; }
+
+    /* 排行榜 */
+    .rank-list { list-style:none; }
+    .rank-item {
+      display:flex; justify-content:space-between; align-items:center;
+      padding:8px 0; border-bottom:1px solid #2a1e40; font-size:13px;
+    }
+    .rank-item:last-child { border:none; }
+    .rank-item .name { color:#d0c0e0; }
+    .rank-item .count { color:#c084fc; font-weight:600; }
+    .rank-item .badge {
+      display:inline-block; width:20px; height:20px; line-height:20px;
+      text-align:center; border-radius:4px; background:#2f2050; color:#a890c0;
+      font-size:11px; font-weight:700; margin-right:10px;
+    }
+    .rank-item .badge.gold { background:#b8860b33; color:#ffd700; }
+    .rank-item .badge.silver { background:#88888833; color:#ccc; }
+
+    /* 最近事件流 */
+    .events-table { width:100%; border-collapse:collapse; font-size:12px; }
+    .events-table th {
+      text-align:left; padding:8px 10px; color:#888; font-weight:500;
+      border-bottom:1px solid #2f2050;
+    }
+    .events-table td { padding:7px 10px; border-bottom:1px solid #1e1530; }
+    .events-table tr:hover td { background:#1e1530; }
+    .tag {
+      display:inline-block; padding:2px 8px; border-radius:4px;
+      font-size:11px; font-weight:500;
+    }
+    .tag-pv { background:#3b2a6033; color:#a78bfa; }
+    .tag-start { background:#1a4a2a33; color:#4ade80; }
+    .tag-result { background:#5b2a5a33; color:#f472b6; }
+    .tag-share { background:#4a3a1a33; color:#facc15; }
+    .tag-click { background:#1a3a5a33; color:#60a5fa; }
+    .tag-other { background:#2a2a2a33; color:#888; }
+
+    .loading { text-align:center; padding:80px 0; color:#888; font-size:14px; }
+    .error-msg { text-align:center; padding:40px; color:#f87171; }
+
+    @media(max-width:720px) {
+      .charts { grid-template-columns:1fr; }
+      body { padding:14px; }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>📊 短剧人格测试 · 数据看板 <small id="lastRefresh"></small></h1>
+  <div class="subtitle" id="subtitle">加载中...</div>
+
+  <div class="loading" id="loading">正在连接 Supabase ···</div>
+  <div class="error-msg" id="error" style="display:none;"></div>
+
+  <div id="dashboard" style="display:none;">
+    <!-- 统计卡片 -->
+    <div class="stats" id="stats"></div>
+
+    <!-- 图表 -->
+    <div class="charts">
+      <div class="chart-box"><h3>🎭 角色分布</h3><canvas id="chartChar"></canvas></div>
+      <div class="chart-box"><h3>🌍 世界分布</h3><canvas id="chartWorld"></canvas></div>
+      <div class="chart-box full"><h3>🎬 短剧推荐点击榜</h3><canvas id="chartClick" style="max-height:200px;"></canvas></div>
+      <div class="chart-box full"><h3>📈 事件时间线（按小时）</h3><canvas id="chartTimeline"></canvas></div>
+    </div>
+
+    <!-- 最近事件 -->
+    <div class="chart-box" style="grid-column:1/-1;">
+      <h3>⏱ 最近事件流</h3>
+      <div style="max-height:400px;overflow-y:auto;">
+        <table class="events-table" id="eventsTable">
+          <thead><tr><th>时间</th><th>事件</th><th>世界</th><th>角色</th><th>页面</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://rokizgtbaajukolbfjsu.supabase.co'
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJva2l6Z3RiYWFqdWtvbGJmanN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxNzU0MjgsImV4cCI6MjA5NDc1MTQyOH0.JQpPnF1TdmRqes8Wv7M2czQqUsoWlOJcCLfqlMaR6nQ'
+
+    const TAG_MAP = {
+      page_view: 'tag-pv',
+      start_random: 'tag-start',
+      start_world: 'tag-start',
+      test_complete: 'tag-result',
+      share_poster: 'tag-share',
+      click_recommend: 'tag-click',
+    }
+    const EVENT_LABELS = {
+      page_view: '浏览页面',
+      start_random: '随机测试',
+      start_world: '选世界测试',
+      test_complete: '完成测试',
+      share_poster: '分享海报',
+      click_recommend: '点击推荐',
+    }
+
+    async function load() {
+      const loading = document.getElementById('loading')
+      const error = document.getElementById('error')
+      const dash = document.getElementById('dashboard')
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/events?select=*&order=id.desc&limit=2000`, {
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+          }
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+        const events = await res.json()
+        loading.style.display = 'none'
+        dash.style.display = 'block'
+        document.getElementById('lastRefresh').textContent = `最后更新: ${new Date().toLocaleTimeString()}`
+        document.getElementById('subtitle').textContent =
+          `共 ${events.length} 条事件记录`
+        renderCards(events)
+        renderCharDist(events)
+        renderWorldDist(events)
+        renderClickRank(events)
+        renderTimeline(events)
+        renderRecent(events)
+      } catch (e) {
+        loading.style.display = 'none'
+        error.style.display = 'block'
+        error.textContent = '❌ ' + e.message
+      }
+    }
+
+    // ---- 统计卡片 ----
+    function renderCards(events) {
+      const total = events.length
+      const pageViews = events.filter(e => e.event === 'page_view').length
+      const testsStarted = events.filter(e => ['start_random', 'start_world'].includes(e.event)).length
+      const testsCompleted = events.filter(e => e.event === 'test_complete').length
+      const shared = events.filter(e => e.event === 'share_poster').length
+      const clicks = events.filter(e => e.event === 'click_recommend').length
+      const uniqueUA = new Set(events.map(e => e.user_agent).filter(Boolean)).size
+
+      const shareRate = testsCompleted ? ((shared / testsCompleted) * 100).toFixed(1) : '-'
+      const clickRate = testsCompleted ? ((clicks / testsCompleted) * 100).toFixed(1) : '-'
+
+      document.getElementById('stats').innerHTML = `
+        <div class="card"><div class="num">${total}</div><div class="label">📡 总事件数</div><div class="sub">${uniqueUA} 个独立设备</div></div>
+        <div class="card"><div class="num">${testsStarted}</div><div class="label">🎯 开始测试</div><div class="sub">${testsCompleted} 次完成</div></div>
+        <div class="card"><div class="num">${testsCompleted}</div><div class="label">✅ 完成测试</div><div class="sub">完成率 ${testsStarted ? (testsCompleted/testsStarted*100).toFixed(0) : 0}%</div></div>
+        <div class="card"><div class="num">${shared}</div><div class="label">📤 分享次数</div><div class="sub">分享率 ${shareRate}%</div></div>
+        <div class="card"><div class="num">${clicks}</div><div class="label">🖱 推荐点击</div><div class="sub">点击率 ${clickRate}%</div></div>
+        <div class="card"><div class="num">${pageViews}</div><div class="label">👁 页面浏览</div><div class="sub">人均 ${total ? (pageViews/uniqueUA).toFixed(1) : 0} 次</div></div>
+      `
+    }
+
+    // ---- 角色分布 ----
+    function renderCharDist(events) {
+      const completed = events.filter(e => e.event === 'test_complete')
+      const map = {}
+      completed.forEach(e => {
+        const key = e.chara_name || e.chara || '未知'
+        map[key] = (map[key] || 0) + 1
+      })
+      const labels = Object.keys(map)
+      const data = Object.values(map)
+      const colors = ['#c084fc','#f472b6','#60a5fa','#4ade80','#facc15','#fb923c','#a78bfa','#34d399']
+
+      new Chart(document.getElementById('chartChar'), {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data, backgroundColor: colors.slice(0, labels.length), borderWidth: 0 }] },
+        options: {
+          responsive: true, maintainAspectRatio: true,
+          plugins: { legend: { position: 'right', labels: { color: '#a890c0', font: { size: 11 } } } }
+        }
+      })
+    }
+
+    // ---- 世界分布 ----
+    function renderWorldDist(events) {
+      const map = {}
+      // 从 start_world 或 test_complete 事件中提取世界
+      events.forEach(e => {
+        const w = e.world
+        if (w) map[w] = (map[w] || 0) + 1
+      })
+      const labels = Object.keys(map)
+      const data = Object.values(map)
+      const colors = ['#c084fc','#f472b6','#60a5fa','#4ade80','#facc15','#fb923c','#a78bfa','#34d399']
+
+      new Chart(document.getElementById('chartWorld'), {
+        type: 'bar',
+        data: { labels, datasets: [{ label: '事件数', data, backgroundColor: colors.slice(0, labels.length), borderRadius: 4 }] },
+        options: {
+          responsive: true, maintainAspectRatio: true,
+          scales: { y: { beginAtZero: true, ticks: { color: '#888', stepSize: 1 }, grid: { color: '#1e1530' } }, x: { ticks: { color: '#a890c0' }, grid: { display: false } } },
+          plugins: { legend: { display: false } }
+        }
+      })
+    }
+
+    // ---- 推荐点击榜 ----
+    function renderClickRank(events) {
+      const clicks = events.filter(e => e.event === 'click_recommend' && e.title)
+      const map = {}
+      clicks.forEach(e => { map[e.title] = (map[e.title] || 0) + 1 })
+      const sorted = Object.entries(map).sort((a, b) => b[1] - a[1])
+      const labels = sorted.map(s => s[0].length > 20 ? s[0].slice(0, 20) + '…' : s[0])
+      const data = sorted.map(s => s[1])
+      const colors = ['#facc15','#60a5fa','#f472b6','#4ade80','#c084fc','#fb923c','#a78bfa','#34d399']
+
+      new Chart(document.getElementById('chartClick'), {
+        type: 'bar',
+        data: { labels, datasets: [{ label: '点击', data, backgroundColor: colors.slice(0, labels.length), borderRadius: 4 }] },
+        options: {
+          indexAxis: 'y', responsive: true, maintainAspectRatio: true,
+          scales: { x: { beginAtZero: true, ticks: { color: '#888', stepSize: 1 }, grid: { color: '#1e1530' } }, y: { ticks: { color: '#a890c0', font: { size: 11 } }, grid: { display: false } } },
+          plugins: { legend: { display: false } }
+        }
+      })
+    }
+
+    // ---- 时间线 ----
+    function renderTimeline(events) {
+      const hourMap = {}
+      events.forEach(e => {
+        if (!e.timestamp) return
+        const h = e.timestamp.slice(0, 13) // '2026-05-19T10'
+        hourMap[h] = (hourMap[h] || 0) + 1
+      })
+      const sorted = Object.entries(hourMap).sort((a, b) => a[0].localeCompare(b[0]))
+      const labels = sorted.map(s => s[0].slice(11) + ':00')
+      const data = sorted.map(s => s[1])
+
+      new Chart(document.getElementById('chartTimeline'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: '事件数', data, borderColor: '#c084fc', backgroundColor: 'rgba(192,132,252,0.1)',
+            fill: true, tension: 0.3, pointRadius: 3, pointBackgroundColor: '#c084fc',
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: true,
+          scales: {
+            y: { beginAtZero: true, ticks: { color: '#888', stepSize: 1 }, grid: { color: '#1e1530' } },
+            x: { ticks: { color: '#888', maxTicksLimit: 12 }, grid: { display: false } }
+          },
+          plugins: { legend: { display: false } }
+        }
+      })
+    }
+
+    // ---- 最近事件流 ----
+    function renderRecent(events) {
+      const tbody = document.querySelector('#eventsTable tbody')
+      const recent = events.slice(0, 50)
+      tbody.innerHTML = recent.map(e => {
+        const tagClass = TAG_MAP[e.event] || 'tag-other'
+        const label = EVENT_LABELS[e.event] || e.event
+        const time = e.timestamp ? e.timestamp.slice(11, 19) : '-'
+        return `<tr>
+          <td style="color:#888;white-space:nowrap;">${time}</td>
+          <td><span class="tag ${tagClass}">${label}</span></td>
+          <td>${e.world || '-'}</td>
+          <td>${e.chara_name || e.chara || '-'}</td>
+          <td style="color:#888;font-size:11px;">${e.page || '-'}</td>
+        </tr>`
+      }).join('')
+    }
+
+    load()
+  </script>
+</body>
+</html>
