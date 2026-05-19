@@ -24,7 +24,7 @@ const TRACKER = {
     const record = {
       event,
       ...data,
-      ts: new Date().toISOString(),
+      timestamp: new Date().toISOString(),
       page: window.location.hash || '#welcome',
       user_agent: navigator.userAgent.slice(0, 120),
     }
