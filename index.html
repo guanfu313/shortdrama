@@ -206,6 +206,25 @@ a { color: var(--pk); text-decoration: none; }
   border-top-color: var(--pk); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to{transform:rotate(360deg)} }
 .loading-overlay .lt { font-size: 14px; color: var(--text-muted); }
+
+/* 解锁弹窗 */
+.modal-overlay { position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.65);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;animation:fadeIn .25s ease;padding:20px; }
+.modal-overlay.active { display:flex; }
+.modal-box { background:linear-gradient(160deg,#1E1436,#16112A);border:1px solid #3A2860;border-radius:20px;padding:28px 24px;width:100%;max-width:340px;text-align:center;animation:popIn .3s ease; }
+@keyframes popIn { 0%{transform:scale(.9);opacity:0} 100%{transform:scale(1);opacity:1} }
+.modal-box .m-emoji { font-size:48px;margin-bottom:12px; }
+.modal-box .m-title { font-size:20px;font-weight:800;margin-bottom:6px; }
+.modal-box .m-desc { font-size:13px;color:var(--text-muted);line-height:1.6;margin-bottom:20px; }
+.modal-box .m-highlight { color:var(--pk);font-weight:700; }
+.modal-box .m-btn { width:100%;padding:14px;border:0;border-radius:50px;font-size:15px;font-weight:700;cursor:pointer;transition:all .2s;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:8px; }
+.modal-box .m-btn:active { transform:scale(.97); }
+.modal-box .m-btn-share { background:linear-gradient(135deg,var(--pk),var(--pk-dark));color:#fff;margin-bottom:10px; }
+.modal-box .m-btn-wait { background:rgba(255,255,255,.06);color:var(--text-muted);border:1px solid rgba(255,255,255,.1); }
+.modal-box .m-btn-wait .countdown { color:var(--pk);font-weight:800;min-width:24px;display:inline-block; }
+.modal-box .m-btn-wait.unlocked { color:#4ade80;border-color:#4ade80; }
+.modal-box .m-tip { font-size:11px;color:#6a5a7a;margin-top:12px; }
+.modal-box .m-close { font-size:12px;color:#6a5a7a;cursor:pointer;margin-top:14px;display:inline-block;text-decoration:underline;opacity:.6; }
+
 </style>
 </head>
 <body>
@@ -293,6 +312,21 @@ a { color: var(--pk); text-decoration: none; }
   </div>
 </div>
 
+</div>
+
+<!-- ========== 解锁弹窗 ========== -->
+<div id="unlockModal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="m-emoji" id="unlockEmoji">🔒</div>
+    <div class="m-title" id="unlockTitle">解锁世界</div>
+    <div class="m-desc" id="unlockDesc">选择随机进入免费且快速，指定世界需要解锁～</div>
+    <button class="m-btn m-btn-share" onclick="handleUnlockShare()">📤 分享给好友免费解锁</button>
+    <button class="m-btn m-btn-wait" id="unlockWaitBtn" onclick="handleUnlockWait()">⏳ 等待 <span class="countdown" id="unlockCountdown">15</span> 秒</button>
+    <div class="m-tip">💡 分享后解锁永久有效，下次直接进入</div>
+    <div class="m-close" onclick="closeUnlockModal()">算了，还是随机吧</div>
+  </div>
+</div>
+
 <script src="data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="tracker.js"></script>
@@ -306,7 +340,58 @@ const STATE = {
   currentQ: 0,       // 当前题号(0-index)
   answers: [],       // 用户答案索引数组
   result: null,      // 结果角色
+}  pendingWorld: null, // 待解锁的世界
 }
+
+// ====== 解锁系统 ======
+function isWorldUnlocked(id) {
+  try { return JSON.parse(localStorage.getItem('sd_unlocked')||'[]').includes(id) } catch(e){ return false }
+}
+function markUnlocked(id) {
+  try { var a=JSON.parse(localStorage.getItem('sd_unlocked')||'[]'); if(!a.includes(id)){ a.push(id); localStorage.setItem('sd_unlocked',JSON.stringify(a)) } } catch(e){}
+}
+function tryPickWorld(id) {
+  if (isWorldUnlocked(id)) { STATE.world=id; startTest(id); return }
+  STATE.pendingWorld=id; var w=W.find(function(x){return x.id===id});
+  document.getElementById('unlockEmoji').textContent=w.emoji;
+  document.getElementById('unlockTitle').textContent='🔒 解锁「'+w.name+'」';
+  document.getElementById('unlockDesc').innerHTML='选择 <span class="m-highlight">'+w.name+'</span> 需要解锁。<br>🎲 <b>随机进入</b>免费快速，还能抽 SSR！<br>📤 分享给好友即可永久解锁此世界 ~';
+  document.getElementById('unlockCountdown').textContent='15';
+  document.getElementById('unlockWaitBtn').classList.remove('unlocked');
+  document.getElementById('unlockWaitBtn').innerHTML='⏳ 等待 <span class="countdown" id="unlockCountdown">15</span> 秒';
+  if(window.unlockTimer){clearInterval(window.unlockTimer);window.unlockTimer=null}
+  document.getElementById('unlockModal').classList.add('active');
+}
+function closeUnlockModal() {
+  document.getElementById('unlockModal').classList.remove('active');
+  if(window.unlockTimer){clearInterval(window.unlockTimer);window.unlockTimer=null}
+  STATE.pendingWorld=null;
+}
+function handleUnlockShare() {
+  var w=W.find(function(x){return x.id===STATE.pendingWorld}); if(!w)return;
+  var u=window.location.href.split('?')[0]+'?from='+STATE.pendingWorld;
+  var t='🎬 我在测「短剧人格」，抽到了【'+w.name+'】世界！来看看你是短剧里的什么角色～';
+  if(navigator.share){navigator.share({title:'短剧人格测试',text:t,url:u}).then(function(){doUnlock(w,'share')}).catch(function(){})}
+  else{copyText(t+'\n'+u);showToast('📋 链接已复制！分享给微信好友即可解锁～');doUnlock(w,'share_manual')}
+}
+function handleUnlockWait() {
+  var b=document.getElementById('unlockWaitBtn'),c=document.getElementById('unlockCountdown');
+  if(b.classList.contains('unlocked')||window.unlockTimer)return;
+  var s=14; window.unlockTimer=setInterval(function(){
+    c.textContent=s; if(s<=0){clearInterval(window.unlockTimer);window.unlockTimer=null;
+      var w=W.find(function(x){return x.id===STATE.pendingWorld}); if(w)doUnlock(w,'wait')}
+    s--},1000);
+}
+function doUnlock(w,m) {
+  markUnlocked(w.id);
+  if(typeof TRACKER!=='undefined'&&TRACKER.track)TRACKER.track('unlock_world',{world:w.id,unlock_method:m,world_name:w.name});
+  closeUnlockModal(); STATE.world=w.id; startTest(w.id);
+}
+function copyText(t) {
+  if(navigator.clipboard){navigator.clipboard.writeText(t).catch(function(){})}
+  else{var a=document.createElement('textarea');a.value=t;a.style.position='fixed';a.style.opacity='0';document.body.appendChild(a);a.select();document.execCommand('copy');document.body.removeChild(a)}
+}
+
 
 const W = WORLDS; const C = CHARA; const Q = QUESTIONS;
 
@@ -332,16 +417,13 @@ function renderWelcome() {
   const grid = document.getElementById('worldGrid');
   grid.innerHTML = W.map(w => {
     const isSSR = w.id === 'R';
-    const isLocked = isSSR;
-    const probText = isSSR ? 'SSR 2%' : `${w.prob}%`;
-    return `<div class="world-card ${isSSR?'ssr':''} ${isLocked?'locked':''}"
-                onclick="${isLocked ? `showToast('⚠️ 规则怪谈被异界干扰，无法选中，试试随机入口~')` : `pickWorld('${w.id}')`}"
-                style="${isSSR ? '' : ''}">
+    return `<div class="world-card ${isSSR?'ssr':''}"
+                onclick="${isSSR ? "showToast('🌟 SSR规则怪谈世界只能通过随机进入哦，试试🎲随机按钮~')" : `tryPickWorld('${w.id}')`}">
       ${isSSR ? '<div class="ssr-badge">SSR</div>' : ''}
       <div class="emoji">${w.emoji}</div>
       <div class="wname">${w.name}</div>
       <div class="wdesc">${w.desc}</div>
-      <div class="wprob">${probText}</div>
+      ${isSSR ? '<div class="ssr-only">🎰 SSR 2% 仅随机</div>' : ''}
     </div>`;
   }).join('');
 
@@ -700,7 +782,6 @@ async function sharePoster() {
 /* ============================================================ */
 // 保存原始函数引用
 const _origStartRandom = startRandom
-const _origPickWorld = pickWorld
 const _origShowResult = showResult
 
 // 重写 startRandom
@@ -712,11 +793,7 @@ startRandom = function() {
   _origStartRandom()
 }
 
-// 重写 pickWorld
-pickWorld = function(id) {
-  TRACKER.track('pick_world', { world: id })
-  _origPickWorld(id)
-}
+// pickWorld 已替换为 tryPickWorld（带解锁流程）
 
 // 重写 showResult，加入推荐 & 埋点
 showResult = function(chara, scores, dims) {
