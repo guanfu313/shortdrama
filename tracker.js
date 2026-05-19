@@ -24,9 +24,9 @@ const TRACKER = {
     const record = {
       event,
       ...data,
-      timestamp: new Date().toISOString(),
+      ts: new Date().toISOString(),
       page: window.location.hash || '#welcome',
-      userAgent: navigator.userAgent.slice(0, 120),
+      user_agent: navigator.userAgent.slice(0, 120),
     }
 
     // 1. 存本地（持久化，防止丢失）
