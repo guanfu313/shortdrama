@@ -341,13 +341,54 @@ const STATE = {
   pendingWorld: null, // 待解锁的世界
 }
 
+// ====== 用户 & 邀请系统 ======
+function getUserId() {
+  var uid = localStorage.getItem('sd_user_id');
+  if (!uid) {
+    uid = 'u' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+    localStorage.setItem('sd_user_id', uid);
+  }
+  return uid;
+}
+
+// 检测入口链接是否带 ?ref=X
+function handleIncomingReferral() {
+  var params = new URLSearchParams(window.location.search);
+  var ref = params.get('ref');
+  if (ref && typeof TRACKER !== 'undefined' && TRACKER.track) {
+    TRACKER.track('referral_visit', { ref: ref, visitor: getUserId() });
+  }
+}
+
+// 查询 Supabase：有没有人通过我的链接来过？
+async function checkHasReferral(uid) {
+  try {
+    var url = TRACKER.supabaseUrl + '/rest/v1/events?event=eq.referral_visit&ref=eq.' + encodeURIComponent(uid) + '&select=id&limit=1';
+    var res = await fetch(url, {
+      headers: { 'apikey': TRACKER.supabaseKey, 'Authorization': 'Bearer ' + TRACKER.supabaseKey }
+    });
+    if (!res.ok) return false;
+    var data = await res.json();
+    return data && data.length > 0;
+  } catch(e) { return false; }
+}
+
 // ====== 解锁系统 ======
-function tryPickWorld(id) {
+async function tryPickWorld(id) {
+  // 先查有没有人通过你的邀请链接来过
+  showToast('⏳ 正在检测分享状态...');
+  var hasRef = await checkHasReferral(getUserId());
+  if (hasRef) {
+    STATE.world = id;
+    startTest(id);
+    return;
+  }
+  // 没有 → 弹出分享
   STATE.pendingWorld = id;
   const w = W.find(function(x){return x.id===id});
   document.getElementById('unlockEmoji').textContent = w.emoji;
   document.getElementById('unlockTitle').textContent = '🔒 解锁「'+w.name+'」';
-  document.getElementById('unlockDesc').innerHTML = '选择 <span class="m-highlight">'+w.name+'</span> 需要解锁。<br>🎲 <b>随机进入</b>免费快速，还能抽 SSR！<br>📤 分享给好友即可解锁此世界 ~';
+  document.getElementById('unlockDesc').innerHTML = '选择 <span class="m-highlight">'+w.name+'</span> 需要解锁。<br>🎲 <b>随机进入</b>免费快速，还能抽 SSR！<br>📤 <b>分享链接给好友</b>，TA 点开后即可解锁此世界 ~';
   document.getElementById('unlockModal').classList.add('active');
 }
 function closeUnlockModal() {
@@ -356,14 +397,11 @@ function closeUnlockModal() {
 }
 function handleUnlockShare() {
   var w=W.find(function(x){return x.id===STATE.pendingWorld}); if(!w)return;
-  var u=window.location.href.split('?')[0]+'?from='+STATE.pendingWorld;
+  var uid = getUserId();
+  var u=window.location.href.split('?')[0]+'?ref='+uid;
   var t='🎬 我在测「短剧人格」，抽到了【'+w.name+'】世界！来看看你是短剧里的什么角色～';
-  if(navigator.share){navigator.share({title:'短剧人格测试',text:t,url:u}).then(function(){doUnlock(w,'share')}).catch(function(){})}
-  else{copyText(t+'\n'+u);showToast('📋 链接已复制！分享给微信好友即可解锁～');doUnlock(w,'share_manual')}
-}
-function doUnlock(w,m) {
-  if(typeof TRACKER!=='undefined'&&TRACKER.track)TRACKER.track('unlock_world',{world:w.id,unlock_method:m,world_name:w.name});
-  closeUnlockModal(); STATE.world=w.id; startTest(w.id);
+  if(navigator.share){navigator.share({title:'短剧人格测试',text:t,url:u}).then(function(){showToast('✅ 链接已分享！好友点开后即可解锁')}).catch(function(){})}
+  else{copyText(t+'\n'+u);showToast('📋 链接已复制！发给微信好友，TA 点开后自动解锁')}
 }
 function copyText(t) {
   if(navigator.clipboard){navigator.clipboard.writeText(t).catch(function(){})}
@@ -782,6 +820,9 @@ showResult = function(chara, scores, dims) {
 
 // 首页访问埋点
 TRACKER.track('page_view', { page: 'welcome' })
+
+// 检测是否通过他人邀请链接进入
+handleIncomingReferral();
 
 /* ============================================================ */
 /* 初始化 */
