@@ -207,7 +207,7 @@ a { color: var(--pk); text-decoration: none; }
 @keyframes spin { to{transform:rotate(360deg)} }
 .loading-overlay .lt { font-size: 14px; color: var(--text-muted); }
 
-/* 解锁弹窗 */
+  /* 解锁弹窗 */
 .modal-overlay { position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.65);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;animation:fadeIn .25s ease;padding:20px; }
 .modal-overlay.active { display:flex; }
 .modal-box { background:linear-gradient(160deg,#1E1436,#16112A);border:1px solid #3A2860;border-radius:20px;padding:28px 24px;width:100%;max-width:340px;text-align:center;animation:popIn .3s ease; }
@@ -225,18 +225,69 @@ a { color: var(--pk); text-decoration: none; }
 .modal-box .m-tip { font-size:11px;color:#6a5a7a;margin-top:12px; }
 .modal-box .m-close { font-size:12px;color:#6a5a7a;cursor:pointer;margin-top:14px;display:inline-block;text-decoration:underline;opacity:.6; }
 
+/* ============================================================ */
+/* 全屏加载页 */
+/* ============================================================ */
+.splash {
+  position: fixed; inset: 0; z-index: 9999;
+  background: linear-gradient(160deg, #1A1A2E 0%, #16213E 50%, #1A1A2E 100%);
+  display: flex; align-items: center; justify-content: center;
+  animation: splashIn .5s ease;
+}
+@keyframes splashIn { 0%{opacity:0} 100%{opacity:1} }
+.splash-content { text-align: center; padding: 20px; max-width: 320px; }
+.splash-emoji { font-size: 56px; margin-bottom: 12px; animation: splashBounce 1.5s ease-in-out infinite; }
+@keyframes splashBounce {
+  0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)}
+}
+.splash-title { font-size: 26px; font-weight: 900; background: linear-gradient(135deg,var(--pk),var(--pk-light));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 16px; }
+.splash-status { font-size: 14px; color: var(--text-muted); margin-bottom: 16px; min-height: 24px;
+  transition: opacity .3s; }
+.splash-status .highlight { color: var(--pk); -webkit-text-fill-color: var(--pk); }
+.splash-bar-wrap {
+  width: 200px; height: 4px; background: rgba(255,255,255,.1); border-radius: 2px;
+  margin: 0 auto 8px; overflow: hidden;
+}
+.splash-bar { height: 100%; width: 0%; border-radius: 2px;
+  background: linear-gradient(90deg, var(--pk), var(--pk-light));
+  transition: width .5s ease; }
+.splash-pct { font-size: 12px; color: var(--text-muted); opacity: .5; margin-bottom: 24px; }
+.splash-hint { font-size: 12px; color: rgba(255,255,255,.2); margin-top: 24px; }
+.splash-dots::after { content: ''; animation: dots 1.5s steps(3,end) infinite; display: inline-block; width: 16px; text-align: left; }
+@keyframes dots { 0%{content:''} 33%{content:'.'} 66%{content:'..'} 100%{content:'...'} }
+.splash-retry { margin-top: 20px; }
+.splash-retry .btn { padding: 12px 32px; font-size: 15px; }
+.splash-retry .hint { font-size: 12px; color: var(--text-muted); margin-top: 10px; }
+
 </style>
 </head>
 <body>
 
+<!-- ========== 全屏加载页（先显示这个） ========== -->
+<div id="splash" class="splash">
+  <div class="splash-content">
+    <div class="splash-emoji">🎬</div>
+    <div class="splash-title">短剧人格测试</div>
+    <div class="splash-status" id="splashStatus">正在穿越到短剧世界<span class="splash-dots"></span></div>
+    <div class="splash-bar-wrap"><div class="splash-bar" id="splashBar"></div></div>
+    <div class="splash-pct" id="splashPct">0%</div>
+    <div class="splash-retry" id="splashRetry" style="display:none">
+      <button class="btn btn-primary" onclick="retryLoad()">🔄 重新连接</button>
+      <div class="hint">网络不太稳定，点一下重试就好～</div>
+    </div>
+    <div class="splash-hint">首次加载较慢，请稍候...</div>
+  </div>
+</div>
+
 <!-- ========== 加载遮罩 ========== -->
 <div id="loading" class="loading-overlay" style="display:none">
   <div class="spinner"></div>
-  <div class="lt">正在解析你的短剧人格...</div>
+  <div class="lt" id="loadingText">正在解析你的短剧人格...</div>
 </div>
 
 <!-- ========== 欢迎页 ========== -->
-<div id="welcome" class="page active">
+<div id="welcome" class="page">
   <div class="welcome-title">
     <div class="big">🎬 短剧人格测试</div>
     <div class="sub">测测你在短剧里是<span>什么角色</span></div>
@@ -326,9 +377,7 @@ a { color: var(--pk); text-decoration: none; }
   </div>
 </div>
 
-<script src="data.js"></script>
-
-<script src="tracker.js"></script>
+<!-- 脚本通过 splash 加载器动态注入（带自动重试） -->
 <script>
 /* ============================================================ */
 /* 状态管理 */
@@ -786,6 +835,72 @@ window.addEventListener('hashchange', () => {
   if (!document.getElementById(h)) return;
   showPage(h);
 });
+
+/* ============================================================ */
+/* splash 加载管理器（动态加载 + 自动重试） */
+/* ============================================================ */
+const $splash = {
+  retries: 0,
+  MAX: 3,
+
+  setStatus(msg, pct) {
+    document.getElementById('splashStatus').textContent = msg;
+    if (pct !== undefined) {
+      document.getElementById('splashBar').style.width = pct;
+      document.getElementById('splashPct').textContent = pct;
+    }
+  },
+
+  loadScript(src) {
+    return new Promise((ok, fail) => {
+      const s = document.createElement('script');
+      s.src = src + '?_t=' + Date.now(); // 防缓存
+      s.onload = ok;
+      s.onerror = () => fail(new Error('load_fail'));
+      document.head.appendChild(s);
+    });
+  },
+
+  showApp() {
+    document.getElementById('splash').style.display = 'none';
+    document.getElementById('welcome').classList.add('active');
+    // 手动触发一次 hashchange 以恢复路由状态
+    window.dispatchEvent(new Event('hashchange'));
+  },
+
+  async start() {
+    this.setStatus('正在加载剧本<span class="splash-dots"></span>', '20%');
+    try {
+      await this.loadScript('data.js');
+      this.setStatus('正在加载角色数据<span class="splash-dots"></span>', '50%');
+      await this.loadScript('tracker.js');
+      this.setStatus('准备就绪 🎬', '100%');
+      // 等进度条动画走完再切
+      setTimeout(() => this.showApp(), 400);
+    } catch (e) {
+      this.retries++;
+      if (this.retries <= this.MAX) {
+        this.setStatus(
+          `连接不稳定，自动重试中 (${this.retries}/${this.MAX})<span class="splash-dots"></span>`,
+          '10%'
+        );
+        await new Promise(r => setTimeout(r, 2000 + this.retries * 500));
+        this.start();
+      } else {
+        this.setStatus('加载失败 😢', '0%');
+        document.getElementById('splashRetry').style.display = 'block';
+      }
+    }
+  }
+};
+
+function retryLoad() {
+  $splash.retries = 0;
+  document.getElementById('splashRetry').style.display = 'none';
+  $splash.start();
+}
+
+$splash.start();
 </script>
 </body>
 </html>
