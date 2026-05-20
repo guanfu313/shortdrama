@@ -225,60 +225,9 @@ a { color: var(--pk); text-decoration: none; }
 .modal-box .m-tip { font-size:11px;color:#6a5a7a;margin-top:12px; }
 .modal-box .m-close { font-size:12px;color:#6a5a7a;cursor:pointer;margin-top:14px;display:inline-block;text-decoration:underline;opacity:.6; }
 
-/* ============================================================ */
-/* 全屏加载页 */
-/* ============================================================ */
-.splash {
-  position: fixed; inset: 0; z-index: 9999;
-  background: linear-gradient(160deg, #1A1A2E 0%, #16213E 50%, #1A1A2E 100%);
-  display: flex; align-items: center; justify-content: center;
-  animation: splashIn .5s ease;
-}
-@keyframes splashIn { 0%{opacity:0} 100%{opacity:1} }
-.splash-content { text-align: center; padding: 20px; max-width: 320px; }
-.splash-emoji { font-size: 56px; margin-bottom: 12px; animation: splashBounce 1.5s ease-in-out infinite; }
-@keyframes splashBounce {
-  0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)}
-}
-.splash-title { font-size: 26px; font-weight: 900; background: linear-gradient(135deg,var(--pk),var(--pk-light));
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 16px; }
-.splash-status { font-size: 14px; color: var(--text-muted); margin-bottom: 16px; min-height: 24px;
-  transition: opacity .3s; }
-.splash-status .highlight { color: var(--pk); -webkit-text-fill-color: var(--pk); }
-.splash-bar-wrap {
-  width: 200px; height: 4px; background: rgba(255,255,255,.1); border-radius: 2px;
-  margin: 0 auto 8px; overflow: hidden;
-}
-.splash-bar { height: 100%; width: 0%; border-radius: 2px;
-  background: linear-gradient(90deg, var(--pk), var(--pk-light));
-  transition: width .5s ease; }
-.splash-pct { font-size: 12px; color: var(--text-muted); opacity: .5; margin-bottom: 24px; }
-.splash-hint { font-size: 12px; color: rgba(255,255,255,.2); margin-top: 24px; }
-.splash-dots::after { content: ''; animation: dots 1.5s steps(3,end) infinite; display: inline-block; width: 16px; text-align: left; }
-@keyframes dots { 0%{content:''} 33%{content:'.'} 66%{content:'..'} 100%{content:'...'} }
-.splash-retry { margin-top: 20px; }
-.splash-retry .btn { padding: 12px 32px; font-size: 15px; }
-.splash-retry .hint { font-size: 12px; color: var(--text-muted); margin-top: 10px; }
-
 </style>
 </head>
 <body>
-
-<!-- ========== 全屏加载页（先显示这个） ========== -->
-<div id="splash" class="splash">
-  <div class="splash-content">
-    <div class="splash-emoji">🎬</div>
-    <div class="splash-title">短剧人格测试</div>
-    <div class="splash-status" id="splashStatus">正在穿越到短剧世界<span class="splash-dots"></span></div>
-    <div class="splash-bar-wrap"><div class="splash-bar" id="splashBar"></div></div>
-    <div class="splash-pct" id="splashPct">0%</div>
-    <div class="splash-retry" id="splashRetry" style="display:none">
-      <button class="btn btn-primary" onclick="retryLoad()">🔄 重新连接</button>
-      <div class="hint">网络不太稳定，点一下重试就好～</div>
-    </div>
-    <div class="splash-hint">首次加载较慢，请稍候...</div>
-  </div>
-</div>
 
 <!-- ========== 加载遮罩 ========== -->
 <div id="loading" class="loading-overlay" style="display:none">
@@ -287,7 +236,7 @@ a { color: var(--pk); text-decoration: none; }
 </div>
 
 <!-- ========== 欢迎页 ========== -->
-<div id="welcome" class="page">
+<div id="welcome" class="page active">
   <div class="welcome-title">
     <div class="big">🎬 短剧人格测试</div>
     <div class="sub">测测你在短剧里是<span>什么角色</span></div>
@@ -306,7 +255,7 @@ a { color: var(--pk); text-decoration: none; }
 </div>
 
 <!-- ========== 测试页 ========== -->
-<div id="test" class="page">
+<div id="test" class="page active">
   <div class="topbar">
     <div class="back" onclick="goHome()">←</div>
     <h1 id="testWorldName">末日废土</h1>
@@ -377,11 +326,9 @@ a { color: var(--pk); text-decoration: none; }
   </div>
 </div>
 
-<!-- 所有脚本内联（单文件，零额外请求） -->
+
 <script>
-// ============================================================
-// 数据层 data.js (内联)
-// ============================================================
+// ===== data.js =====
 // ============================================================
 // 短剧人格测试 - 数据层
 // ============================================================
@@ -1055,9 +1002,7 @@ const QUESTIONS = {
   ],
 }
 
-// ============================================================
-// tracker.js (内联)
-// ============================================================
+// ===== tracker.js =====
 // ============================================================
 // 短剧人格测试 - 数据埋点系统
 // ============================================================
@@ -1184,7 +1129,7 @@ const TRACKER = {
   },
 }
 
-// ============================================================
+// ===== 应用逻辑 =====
 // 应用逻辑
 // ============================================================
 /* ============================================================ */
@@ -1663,14 +1608,9 @@ try { TRACKER.track('page_view', { page: 'welcome' }); } catch(e) {}
 // 检测是否通过他人邀请链接进入
 try { handleIncomingReferral(); } catch(e) {}
 
-// 延迟200ms后隐藏splash（氛围感入场）
-setTimeout(function() {
-  var spl = document.getElementById('splash');
-  if (spl) {
-    spl.style.transition = 'opacity .4s ease';
-    spl.style.opacity = '0';
-    setTimeout(function() { spl.style.display = 'none'; }, 400);
-  }
-  document.getElementById('welcome').classList.add('active');
-}, 200);
+
+// ===== 直接启动 =====
+renderWelcome();
+try { TRACKER.track('page_view', { page: 'welcome' }); } catch(e) {}
+try { handleIncomingReferral(); } catch(e) {}
 </script>
